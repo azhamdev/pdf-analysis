@@ -2,10 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-
-// to inform about payment successful, direct after payment
 import { useRouter, useSearchParams } from "next/navigation";
-
 import {
 	CheckCircle,
 	FileText,
@@ -14,15 +11,12 @@ import {
 	Calendar,
 	Info,
 } from "lucide-react";
-import { extractTextFromPDF } from "@/lib/PDFUtils";
+import { extractTextFromPDF } from "@/lib/pdfUtils";
 
 export default function DashboardContent() {
 	const { user, isLoaded } = useUser();
 
-	// to initialize user
 	const router = useRouter();
-
-	// to access params parameters
 	const searchParams = useSearchParams();
 
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -32,7 +26,6 @@ export default function DashboardContent() {
 	const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
 
 	useEffect(() => {
-		// check if payment success
 		const isPaymentSuccess = searchParams?.get("payment") === "success";
 
 		if (isPaymentSuccess) {
@@ -48,19 +41,17 @@ export default function DashboardContent() {
 	}, [searchParams, router]);
 
 	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		// clearing any error
 		setError("");
 
-		// if undefined
 		if (!e.target.files?.[0]) return;
 
 		setSelectedFile(e.target.files[0]);
 	};
 
-	// to do handle analyze function
+	//TODO: handleAnalyze function
 	const handleAnalyze = useCallback(async () => {
 		if (!selectedFile) {
-			setError("Please selece a file before analyzing.");
+			setError("Please select a file before analyzing.");
 			return;
 		}
 
@@ -69,12 +60,27 @@ export default function DashboardContent() {
 		setSummary("");
 
 		try {
-			// TODO extract text from pdf file
 			const text = await extractTextFromPDF(selectedFile);
-			setSummary(text);
 
-			// TOTO: send the extracted text to API for analysis
-			// const response = "";
+			const response = await fetch("/api/analyze", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Accept: "application/json",
+				},
+				body: JSON.stringify({ text: text.substring(0, 10000) }),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(
+					errorData.error || `HTTP error! status: ${response.status}`
+				);
+			}
+
+			const data = await response.json();
+
+			setSummary(data.summary || "No summary was generated.");
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to analyze PDF.");
 		} finally {
@@ -82,19 +88,53 @@ export default function DashboardContent() {
 		}
 	}, [selectedFile]);
 
-	// to do format summary content function
-	// const formatSummaryContent = ({}) => {};
+	const formatSummaryContent = (text: string) => {
+		const paragraphs = text.split("\n").filter((p) => p.trim() !== "");
+
+		return paragraphs.map((paragraph, index) => {
+			if (paragraph.startsWith("# ")) {
+				return (
+					<h2
+						key={index}
+						className="text-2xl font-bold mt-6 mb-4 bg-gradient-to-r from-purple-400 to-pink-500 
+                                            bg-clip-text text-transparent">
+						{paragraph.replace(/^# /, "")}
+					</h2>
+				);
+			}
+
+			if (paragraph.startsWith("## ")) {
+				return (
+					<h3
+						key={index}
+						className="text-xl font-semibold mt-6 mb-3 text-purple-300 border-b border-purple-500/20 pb-2">
+						{paragraph.replace(/^## /, "")}
+					</h3>
+				);
+			}
+
+			return (
+				<p
+					key={index}
+					className="mb-4 text-gray-300 leading-relaxed hover:text-white transition-colors 
+                                        first-letter:text-lg first-letter:font-medium">
+					{paragraph}
+				</p>
+			);
+		});
+	};
 
 	return (
-		<div className="space-y-10 max-w-4xl mx-auto mt-10">
+		<div className="min-h-[300vh] space-y-10 mt-24 max-w-4xl mx-auto">
 			{showPaymentSuccess && (
 				<div className="bg-green-500/10 max-w-xl mx-auto my-8 border border-green-500/20 rounded-xl p-4 text-green-400">
 					<div className="flex items-center justify-center">
-						<CheckCircle className="h-5 w-5 mr-2" />
-						<p>Payment Successfull! Your Subscription is Active!</p>
+						<CheckCircle className="h-5 w-5 mr-4" />
+						<p>Payment successfull! Your subscription is now active!</p>
 					</div>
 				</div>
 			)}
+
 			{/* File upload and analysis section */}
 			<div className="p-10 space-y-8 rounded-2xl border border-purple-300/10 bg-black/30 shadow-[0_4px_20px_-10px] shadow-purple-200/30">
 				{/* File input for PDF selection */}
@@ -132,6 +172,7 @@ export default function DashboardContent() {
 					</span>
 				</button>
 			</div>
+
 			{/* Error message - only shown when there's an error */}
 			{error && (
 				<div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-400">
@@ -144,6 +185,7 @@ export default function DashboardContent() {
 					</div>
 				</div>
 			)}
+
 			{/* Summary results - only shown when there's a summary */}
 			{summary && (
 				<div className="bg-black/20 shadow-[0_4px_20px_-10px] shadow-purple-200/30 rounded-2xl p-8 border border-[#2A2A35]">
@@ -156,7 +198,7 @@ export default function DashboardContent() {
 
 					{/* Formatted summary content */}
 					<div className="max-w-none px-6 py-5 rounded-xl bg-[#0f0f13] border border-[#2A2A35]">
-						{summary}
+						{formatSummaryContent(summary)}
 					</div>
 				</div>
 			)}

@@ -3,3 +3,14 @@ export const PDF_PROCESSING = {
 	WORKER_SRC:
 		"https://cdn.jsdelivr.net/npm/pdfjs-dist@5.1.91/build/pdf.worker.min.mjs",
 };
+
+export const API = {
+	GEMINI_ENDPOINT:
+		"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+};
+
+export const RATE_LIMIT = {
+	REQUESTS_PER_MINUTE: 5,
+	CACHE_MAX_SIZE: 1000,
+	CACHE_TTL_MS: 60 * 1000,
+};
